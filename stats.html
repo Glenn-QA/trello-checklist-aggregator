@@ -227,6 +227,14 @@
 
         // Calculate stats for each card (same logic as badges)
         for (const card of allCards) {
+          console.log('Processing card:', card.name);
+          console.log('  Has checklists?', !!card.checklists);
+          
+          if (card.checklists && card.checklists.length > 0) {
+            console.log('  Number of checklists:', card.checklists.length);
+            console.log('  First checklist:', card.checklists[0]);
+          }
+          
           const stats = calculateCardStats(card);
           
           if (stats) {
