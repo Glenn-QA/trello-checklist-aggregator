@@ -125,10 +125,60 @@
       font-size: 18px;
       font-weight: 700;
     }
+    .help-box {
+      background: #fff4e6;
+      border: 2px solid #ff9f1a;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .help-box strong {
+      color: #172b4d;
+      font-size: 15px;
+      display: block;
+      margin-bottom: 8px;
+    }
+    .help-box ol {
+      margin: 8px 0 0 20px;
+      padding: 0;
+      color: #5e6c84;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .help-box li {
+      margin: 4px 0;
+    }
+    .success-box {
+      background: #e3fcef;
+      border: 2px solid #61bd4f;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .success-box strong {
+      color: #172b4d;
+      font-size: 15px;
+    }
   </style>
 </head>
 <body>
   <button id="refreshBtn" class="refresh-btn">🔄 Refresh</button>
+  
+  <div id="helpBox" class="help-box" style="display: none;">
+    <strong>📊 How to load statistics:</strong>
+    <ol>
+      <li>Close this modal and <strong>scroll through your board</strong> to load card badges</li>
+      <li>Or <strong>open a few cards</strong> with checklists</li>
+      <li>Come back and click <strong>Refresh</strong></li>
+    </ol>
+    <p style="margin: 8px 0 0 0; color: #5e6c84; font-size: 12px;">
+      💡 The Power-Up collects data as card badges load on your board
+    </p>
+  </div>
+
+  <div id="successBox" class="success-box" style="display: none;">
+    <strong>✅ Statistics loaded successfully!</strong>
+  </div>
   
   <div class="stats-container">
     <div class="stat-card">
@@ -169,61 +219,50 @@
       }
       
       try {
-        console.log('Fetching all cards...');
+        console.log('Loading statistics from card badges...');
         
-        // Try requesting 'all' which should include everything
-        const allCards = await t.cards('all');
-        console.log(`Found ${allCards.length} cards`);
-        console.log('First card sample:', allCards[0]);
+        // Get all cards
+        const allCards = await t.cards('id', 'name');
+        console.log(`Checking ${allCards.length} cards for stored stats...`);
         
         let totalItems = 0;
         let completedItems = 0;
         const cardsWithChecklists = [];
 
-        for (const card of allCards) {
-          console.log(`\nCard: "${card.name}"`);
-          console.log('  Has checklists?', !!card.checklists);
-          
-          if (card.checklists && card.checklists.length > 0) {
-            console.log(`  ${card.checklists.length} checklists found`);
+        // Read stored stats from each card
+        for (const cardInfo of allCards) {
+          try {
+            const stats = await t.get(cardInfo.id, 'shared', 'checklistStats');
             
-            let cardTotal = 0;
-            let cardCompleted = 0;
-
-            card.checklists.forEach((checklist, idx) => {
-              console.log(`    Checklist ${idx}:`, checklist.name);
-              console.log(`      checkItems:`, checklist.checkItems);
-              
-              if (checklist.checkItems && Array.isArray(checklist.checkItems)) {
-                console.log(`      ${checklist.checkItems.length} items`);
-                checklist.checkItems.forEach(item => {
-                  cardTotal++;
-                  totalItems++;
-                  if (item.state === 'complete') {
-                    cardCompleted++;
-                    completedItems++;
-                  }
-                });
-              } else {
-                console.log('      NO checkItems or not an array!');
-              }
-            });
-
-            if (cardTotal > 0) {
-              const percentage = Math.round((cardCompleted / cardTotal) * 100);
-              cardsWithChecklists.push({
-                cardName: card.name,
-                total: cardTotal,
-                completed: cardCompleted,
-                percentage: percentage
-              });
+            if (stats && stats.total > 0) {
+              totalItems += stats.total;
+              completedItems += stats.completed;
+              cardsWithChecklists.push(stats);
+              console.log(`  ✓ ${stats.cardName}: ${stats.completed}/${stats.total}`);
             }
+          } catch (err) {
+            // Card hasn't loaded badge yet
           }
         }
 
-        console.log(`\nFINAL: Total: ${totalItems}, Completed: ${completedItems}, Cards: ${cardsWithChecklists.length}`);
+        console.log(`Found ${cardsWithChecklists.length} cards with checklist data`);
+        console.log(`Total: ${totalItems} items (${completedItems} completed)`);
 
-        // Update UI
+        // Show appropriate message box
+        if (cardsWithChecklists.length === 0) {
+          document.getElementById('helpBox').style.display = 'block';
+          document.getElementById('successBox').style.display = 'none';
+        } else {
+          document.getElementById('helpBox').style.display = 'none';
+          document.getElementById('successBox').style.display = 'block';
+          
+          // Auto-hide success message after 3 seconds
+          setTimeout(() => {
+            document.getElementById('successBox').style.display = 'none';
+          }, 3000);
+        }
+
+        // Update summary stats
         const remainingItems = totalItems - completedItems;
         const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
@@ -235,15 +274,22 @@
         document.getElementById('progressFill').style.width = percentage + '%';
         document.getElementById('progressText').textContent = percentage + '%';
 
-        // Display cards
+        // Display card breakdown
         const cardList = document.getElementById('cardList');
         cardList.innerHTML = '';
 
         if (cardsWithChecklists.length === 0) {
-          cardList.innerHTML = '<div style="text-align: center; padding: 40px; color: #5e6c84;">No cards with checklist items found</div>';
+          cardList.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #5e6c84;">
+              <p style="margin: 0; font-size: 15px;">No data loaded yet</p>
+              <p style="margin: 8px 0 0 0; font-size: 13px;">See instructions above ☝️</p>
+            </div>
+          `;
+          t.sizeTo('body');
           return;
         }
 
+        // Sort by completion percentage (lowest first)
         cardsWithChecklists
           .sort((a, b) => a.percentage - b.percentage)
           .forEach(card => {
@@ -264,8 +310,13 @@
         t.sizeTo('body');
 
       } catch (error) {
-        console.error('Error:', error);
-        document.getElementById('cardList').innerHTML = '<div style="text-align: center; padding: 40px; color: #e81313;">Error loading stats</div>';
+        console.error('Error loading stats:', error);
+        document.getElementById('cardList').innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #e81313;">
+            <p style="margin: 0;">Error loading statistics</p>
+            <p style="margin: 8px 0 0 0; font-size: 13px;">${error.message}</p>
+          </div>
+        `;
       }
     }
 
