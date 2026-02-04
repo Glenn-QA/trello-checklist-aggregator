@@ -53,16 +53,19 @@ TrelloPowerUp.initialize({
       console.log('Badge rendering for card:', card.name);
       
       if (!card.checklists || card.checklists.length === 0) {
-        // No checklists - clear any stored stats
+        console.log('  No checklists found');
         await t.set('card', 'shared', 'checklistStats', null);
         return [];
       }
+
+      console.log('  Found', card.checklists.length, 'checklists');
 
       let totalItems = 0;
       let completedItems = 0;
 
       // Count checklist items
-      card.checklists.forEach(checklist => {
+      card.checklists.forEach((checklist, idx) => {
+        console.log('    Checklist', idx, ':', checklist.name, 'checkItems:', checklist.checkItems);
         if (checklist.checkItems && checklist.checkItems.length > 0) {
           checklist.checkItems.forEach(item => {
             totalItems++;
@@ -70,10 +73,15 @@ TrelloPowerUp.initialize({
               completedItems++;
             }
           });
+        } else {
+          console.log('    NO checkItems or empty array!');
         }
       });
 
+      console.log('  Total items found:', totalItems);
+
       if (totalItems === 0) {
+        console.log('  No items, not storing');
         await t.set('card', 'shared', 'checklistStats', null);
         return [];
       }
