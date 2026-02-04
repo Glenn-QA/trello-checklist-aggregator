@@ -214,6 +214,13 @@
         const allCards = await t.cards('id', 'name', 'checklists');
         console.log(`Found ${allCards.length} cards`);
         
+        if (allCards.length > 0) {
+          console.log('Sample card data:', JSON.stringify(allCards[0], null, 2));
+          if (allCards[0].checklists && allCards[0].checklists.length > 0) {
+            console.log('Sample checklist:', JSON.stringify(allCards[0].checklists[0], null, 2));
+          }
+        }
+        
         let totalItems = 0;
         let completedItems = 0;
         const cardsWithChecklists = [];
