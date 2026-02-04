@@ -125,11 +125,6 @@
       font-size: 18px;
       font-weight: 700;
     }
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: #5e6c84;
-    }
   </style>
 </head>
 <body>
@@ -161,46 +156,12 @@
 
   <h2>Card Breakdown</h2>
   <div id="cardList" class="card-list">
-    <div class="loading">Loading cards...</div>
+    <div style="text-align: center; padding: 20px; color: #5e6c84;">Loading...</div>
   </div>
 
   <script src="https://p.trellocdn.com/power-up.min.js"></script>
   <script>
     let t;
-
-    // Same calculation function as in client.js
-    function calculateCardStats(card) {
-      if (!card.checklists || card.checklists.length === 0) {
-        return null;
-      }
-
-      let totalItems = 0;
-      let completedItems = 0;
-
-      card.checklists.forEach(checklist => {
-        if (checklist.checkItems && checklist.checkItems.length > 0) {
-          checklist.checkItems.forEach(item => {
-            totalItems++;
-            if (item.state === 'complete') {
-              completedItems++;
-            }
-          });
-        }
-      });
-
-      if (totalItems === 0) {
-        return null;
-      }
-
-      const percentage = Math.round((completedItems / totalItems) * 100);
-
-      return {
-        cardName: card.name,
-        total: totalItems,
-        completed: completedItems,
-        percentage: percentage
-      };
-    }
 
     async function loadStats() {
       if (!t) {
@@ -208,46 +169,61 @@
       }
       
       try {
-        console.log('Calculating stats from all cards...');
+        console.log('Fetching all cards...');
         
-        // Get all cards with full checklist data
-        const allCards = await t.cards('id', 'name', 'checklists');
+        // Try requesting 'all' which should include everything
+        const allCards = await t.cards('all');
         console.log(`Found ${allCards.length} cards`);
-        
-        if (allCards.length > 0) {
-          console.log('Sample card data:', JSON.stringify(allCards[0], null, 2));
-          if (allCards[0].checklists && allCards[0].checklists.length > 0) {
-            console.log('Sample checklist:', JSON.stringify(allCards[0].checklists[0], null, 2));
-          }
-        }
+        console.log('First card sample:', allCards[0]);
         
         let totalItems = 0;
         let completedItems = 0;
         const cardsWithChecklists = [];
 
-        // Calculate stats for each card (same logic as badges)
         for (const card of allCards) {
-          console.log('Processing card:', card.name);
+          console.log(`\nCard: "${card.name}"`);
           console.log('  Has checklists?', !!card.checklists);
           
           if (card.checklists && card.checklists.length > 0) {
-            console.log('  Number of checklists:', card.checklists.length);
-            console.log('  First checklist:', card.checklists[0]);
-          }
-          
-          const stats = calculateCardStats(card);
-          
-          if (stats) {
-            totalItems += stats.total;
-            completedItems += stats.completed;
-            cardsWithChecklists.push(stats);
-            console.log(`Card "${stats.cardName}": ${stats.completed}/${stats.total}`);
+            console.log(`  ${card.checklists.length} checklists found`);
+            
+            let cardTotal = 0;
+            let cardCompleted = 0;
+
+            card.checklists.forEach((checklist, idx) => {
+              console.log(`    Checklist ${idx}:`, checklist.name);
+              console.log(`      checkItems:`, checklist.checkItems);
+              
+              if (checklist.checkItems && Array.isArray(checklist.checkItems)) {
+                console.log(`      ${checklist.checkItems.length} items`);
+                checklist.checkItems.forEach(item => {
+                  cardTotal++;
+                  totalItems++;
+                  if (item.state === 'complete') {
+                    cardCompleted++;
+                    completedItems++;
+                  }
+                });
+              } else {
+                console.log('      NO checkItems or not an array!');
+              }
+            });
+
+            if (cardTotal > 0) {
+              const percentage = Math.round((cardCompleted / cardTotal) * 100);
+              cardsWithChecklists.push({
+                cardName: card.name,
+                total: cardTotal,
+                completed: cardCompleted,
+                percentage: percentage
+              });
+            }
           }
         }
 
-        console.log(`Total: ${totalItems}, Completed: ${completedItems}, Cards: ${cardsWithChecklists.length}`);
+        console.log(`\nFINAL: Total: ${totalItems}, Completed: ${completedItems}, Cards: ${cardsWithChecklists.length}`);
 
-        // Update summary stats
+        // Update UI
         const remainingItems = totalItems - completedItems;
         const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
@@ -259,12 +235,12 @@
         document.getElementById('progressFill').style.width = percentage + '%';
         document.getElementById('progressText').textContent = percentage + '%';
 
-        // Display card breakdown
+        // Display cards
         const cardList = document.getElementById('cardList');
         cardList.innerHTML = '';
 
         if (cardsWithChecklists.length === 0) {
-          cardList.innerHTML = '<div class="loading">No cards with checklists found</div>';
+          cardList.innerHTML = '<div style="text-align: center; padding: 40px; color: #5e6c84;">No cards with checklist items found</div>';
           return;
         }
 
@@ -285,18 +261,16 @@
             cardList.appendChild(cardItem);
           });
 
-        // Size modal to content
         t.sizeTo('body');
 
       } catch (error) {
-        console.error('Error loading stats:', error);
-        document.getElementById('cardList').innerHTML = '<div class="loading">Error loading statistics</div>';
+        console.error('Error:', error);
+        document.getElementById('cardList').innerHTML = '<div style="text-align: center; padding: 40px; color: #e81313;">Error loading stats</div>';
       }
     }
 
     // Initialize
     t = window.TrelloPowerUp.iframe();
-    
     document.getElementById('refreshBtn').addEventListener('click', loadStats);
     
     t.render(function() {
