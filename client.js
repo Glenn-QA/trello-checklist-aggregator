@@ -50,6 +50,7 @@ TrelloPowerUp.initialize({
   'card-badges': async function(t, options) {
     try {
       const card = await t.card('id', 'name', 'checklists');
+      console.log('Badge rendering for card:', card.name);
       
       if (!card.checklists || card.checklists.length === 0) {
         // No checklists - clear any stored stats
@@ -80,12 +81,14 @@ TrelloPowerUp.initialize({
       const percentage = Math.round((completedItems / totalItems) * 100);
 
       // Store stats for board aggregation
+      console.log('Storing stats for:', card.name, `${completedItems}/${totalItems}`);
       await t.set('card', 'shared', 'checklistStats', {
         cardName: card.name,
         total: totalItems,
         completed: completedItems,
         percentage: percentage
       });
+      console.log('Stats stored successfully');
 
       // Display badge
       return [{
