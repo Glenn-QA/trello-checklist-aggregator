@@ -2,39 +2,6 @@
 
 const ICON_URL = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDc5YmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI5IDExIDEyIDE0IDIyIDQiPjwvcG9seWxpbmU+PHBhdGggZD0iTTIxIDEydjdhMiAyIDAgMCAxLTIgMkg1YTIgMiAwIDAgMS0yLTJWNWEyIDIgMCAwIDEgMi0yaDExIj48L3BhdGg+PC9zdmc+';
 
-// Shared function to calculate card checklist stats
-function calculateCardStats(card) {
-  if (!card.checklists || card.checklists.length === 0) {
-    return null;
-  }
-
-  let totalItems = 0;
-  let completedItems = 0;
-
-  card.checklists.forEach(checklist => {
-    if (checklist.checkItems && checklist.checkItems.length > 0) {
-      checklist.checkItems.forEach(item => {
-        totalItems++;
-        if (item.state === 'complete') {
-          completedItems++;
-        }
-      });
-    }
-  });
-
-  if (totalItems === 0) {
-    return null;
-  }
-
-  const percentage = Math.round((completedItems / totalItems) * 100);
-
-  return {
-    total: totalItems,
-    completed: completedItems,
-    percentage: percentage
-  };
-}
-
 TrelloPowerUp.initialize({
   'board-buttons': function(t, options) {
     return [{
@@ -71,7 +38,7 @@ TrelloPowerUp.initialize({
           text: 'About',
           callback: function(t) {
             return t.alert({
-              message: 'Checklist Aggregator v1.0\n\nShows checklist completion on cards and aggregates board-wide statistics.',
+              message: 'Checklist Aggregator v1.0\n\nShows checklist completion badges on cards and aggregates board-wide statistics.',
               duration: 5
             });
           }
@@ -83,16 +50,48 @@ TrelloPowerUp.initialize({
   'card-badges': async function(t, options) {
     try {
       const card = await t.card('id', 'name', 'checklists');
-      const stats = calculateCardStats(card);
       
-      if (!stats) {
+      if (!card.checklists || card.checklists.length === 0) {
+        // No checklists - clear any stored stats
+        await t.set('card', 'shared', 'checklistStats', null);
         return [];
       }
 
+      let totalItems = 0;
+      let completedItems = 0;
+
+      // Count checklist items
+      card.checklists.forEach(checklist => {
+        if (checklist.checkItems && checklist.checkItems.length > 0) {
+          checklist.checkItems.forEach(item => {
+            totalItems++;
+            if (item.state === 'complete') {
+              completedItems++;
+            }
+          });
+        }
+      });
+
+      if (totalItems === 0) {
+        await t.set('card', 'shared', 'checklistStats', null);
+        return [];
+      }
+
+      const percentage = Math.round((completedItems / totalItems) * 100);
+
+      // Store stats for board aggregation
+      await t.set('card', 'shared', 'checklistStats', {
+        cardName: card.name,
+        total: totalItems,
+        completed: completedItems,
+        percentage: percentage
+      });
+
+      // Display badge
       return [{
         icon: ICON_URL,
-        text: `${stats.completed}/${stats.total}`,
-        color: stats.percentage === 100 ? 'green' : stats.percentage >= 50 ? 'blue' : 'orange'
+        text: `${completedItems}/${totalItems}`,
+        color: percentage === 100 ? 'green' : percentage >= 50 ? 'blue' : 'orange'
       }];
     } catch (error) {
       console.log('Card badge error:', error);
