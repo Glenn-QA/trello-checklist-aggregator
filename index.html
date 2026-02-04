@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Checklist Aggregator</title>
+  <link rel="stylesheet" href="https://p.trellocdn.com/power-up.min.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      margin: 0;
+    }
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #f4f5f7;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 32px;
+      font-weight: bold;
+      color: #172b4d;
+      margin-bottom: 5px;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #5e6c84;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 30px;
+      background: #e4e6ea;
+      border-radius: 15px;
+      overflow: hidden;
+      margin: 20px 0;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #0079bf, #5ba4cf);
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .progress-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      line-height: 30px;
+      font-weight: bold;
+      color: #172b4d;
+      font-size: 14px;
+    }
+    .card-list {
+      margin-top: 20px;
+    }
+    .card-item {
+      background: white;
+      border: 1px solid #dfe1e6;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .card-name {
+      font-weight: 600;
+      color: #172b4d;
+      margin-bottom: 8px;
+    }
+    .card-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .mini-progress {
+      flex: 1;
+      height: 8px;
+      background: #e4e6ea;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .mini-progress-fill {
+      height: 100%;
+      background: #61bd4f;
+      transition: width 0.3s ease;
+    }
+    .card-stats {
+      font-size: 12px;
+      color: #5e6c84;
+      white-space: nowrap;
+    }
+    h2 {
+      color: #172b4d;
+      margin-top: 0;
+      margin-bottom: 20px;
+    }
+    .refresh-btn {
+      background: #0079bf;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .refresh-btn:hover {
+      background: #026aa7;
+    }
+  </style>
+</head>
+<body>
+  <button class="refresh-btn" onclick="loadStats()">🔄 Refresh</button>
+  
+  <div class="stats-container">
+    <div class="stat-card">
+      <div class="stat-value" id="totalItems">-</div>
+      <div class="stat-label">Total Items</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="completedItems">-</div>
+      <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="remainingItems">-</div>
+      <div class="stat-label">Remaining</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="totalCards">-</div>
+      <div class="stat-label">Cards w/ Checklists</div>
+    </div>
+  </div>
+
+  <div class="progress-bar">
+    <div class="progress-fill" id="progressFill" style="width: 0%">
+      <span class="progress-text" id="progressText">0%</span>
+    </div>
+  </div>
+
+  <h2>Card Breakdown</h2>
+  <div class="card-list" id="cardList"></div>
+
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+  <script>
+    const t = window.TrelloPowerUp.iframe();
+
+    async function loadStats() {
+      try {
+        const board = await t.board('all');
+        const cards = await t.cards('all');
+        
+        let totalItems = 0;
+        let completedItems = 0;
+        const cardsWithChecklists = [];
+
+        for (const card of cards) {
+          if (card.checklists && card.checklists.length > 0) {
+            let cardTotal = 0;
+            let cardCompleted = 0;
+
+            card.checklists.forEach(checklist => {
+              checklist.checkItems.forEach(item => {
+                cardTotal++;
+                totalItems++;
+                if (item.state === 'complete') {
+                  cardCompleted++;
+                  completedItems++;
+                }
+              });
+            });
+
+            cardsWithChecklists.push({
+              name: card.name,
+              total: cardTotal,
+              completed: cardCompleted,
+              percentage: cardTotal > 0 ? Math.round((cardCompleted / cardTotal) * 100) : 0
+            });
+          }
+        }
+
+        const remainingItems = totalItems - completedItems;
+        const percentage = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+        // Update stats
+        document.getElementById('totalItems').textContent = totalItems;
+        document.getElementById('completedItems').textContent = completedItems;
+        document.getElementById('remainingItems').textContent = remainingItems;
+        document.getElementById('totalCards').textContent = cardsWithChecklists.length;
+
+        // Update progress bar
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        progressFill.style.width = percentage + '%';
+        progressText.textContent = percentage + '%';
+
+        // Update card list
+        const cardList = document.getElementById('cardList');
+        cardList.innerHTML = '';
+
+        cardsWithChecklists
+          .sort((a, b) => a.percentage - b.percentage)
+          .forEach(card => {
+            const cardItem = document.createElement('div');
+            cardItem.className = 'card-item';
+            cardItem.innerHTML = `
+              <div class="card-name">${card.name}</div>
+              <div class="card-progress">
+                <div class="mini-progress">
+                  <div class="mini-progress-fill" style="width: ${card.percentage}%"></div>
+                </div>
+                <div class="card-stats">${card.completed}/${card.total} (${card.percentage}%)</div>
+              </div>
+            `;
+            cardList.appendChild(cardItem);
+          });
+
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    // Load stats when modal opens
+    loadStats();
+  </script>
+</body>
+</html>
